@@ -9,7 +9,7 @@
   const grid = $('#grid');
 
   // Everything here is persisted, so reopening the app restores the same screens in the same order.
-  const state = { channels: [], layout: 'grid', main: null, favorites: [], sets: [], hideOffline: true };
+  const state = { channels: [], layout: 'grid', main: null, favorites: [], sets: [], hideOffline: true, statusUrl: '' };
   let audio = null;        // channel whose player is currently loaded unmuted
   let gridAudio = null;    // channel picked for sound in the equal-grid layout
   let userMuted = false;   // focus layout: main screen muted with "mute all" / its sound button
@@ -18,6 +18,7 @@
   const cells = new Map();
   const status = new Map(); // name -> 'live' | 'offline' | 'unknown'
   let statusOk = null;      // null: not checked yet, false: Kick could not be reached
+  let statusErr = '';
   let lastPoll = 0;
 
   // ---------- helpers ----------
@@ -66,6 +67,7 @@
     state.layout = state.layout === 'focus' ? 'focus' : 'grid';
     state.main = parse(state.main);
     state.hideOffline = state.hideOffline !== false;
+    state.statusUrl = cleanUrl(state.statusUrl);
     state.sets = (Array.isArray(state.sets) ? state.sets : [])
       .filter((s) => s && s.name)
       .map((s) => ({ name: String(s.name).slice(0, 40), channels: uniq(s.channels, MAX),
@@ -74,7 +76,28 @@
   function save() { try { localStorage.setItem(KEY, JSON.stringify(state)); } catch { /* storage unavailable */ } }
 
   // ---------- live status ----------
-  // Kick's site API; if the browser can't reach it (CORS, Cloudflare) every channel stays 'unknown' and is shown.
+  // Browsers usually can't ask Kick directly (no CORS), so the status comes from the user's own
+  // Cloudflare Worker (worker/kick-status-worker.js) when one is set up. If nothing answers,
+  // every channel stays 'unknown' and is shown.
+  const WORKER_CODE_URLS = ['worker/kick-status-worker.js',
+    'https://raw.githubusercontent.com/rbblackhack0950/ratti.github.io/main/multikick/worker/kick-status-worker.js'];
+  function cleanUrl(u) {
+    const t = String(u || '').trim().replace(/[?#].*$/, '').replace(/\/+$/, '');
+    return /^https:\/\/[^\s/]+(\/\S*)?$/i.test(t) ? t : '';
+  }
+
+  // Returns name -> 'live' | 'offline' from the Worker, or throws with a readable reason.
+  async function checkViaWorker(names) {
+    let r;
+    try {
+      r = await fetch(`${state.statusUrl}/?c=${names.map(encodeURIComponent).join(',')}`, { cache: 'no-store' });
+    } catch { throw new Error('ติดต่อ Worker ไม่ได้ (ลิงก์ผิดหรือยังไม่ได้ Deploy)'); }
+    const j = await r.json().catch(() => null);
+    if (!j) throw new Error(`Worker ตอบกลับไม่ถูกต้อง (${r.status})`);
+    if (!j.ok) throw new Error(j.error || `Worker error (${r.status})`);
+    return new Map(Object.entries(j.live || {}).map(([n, v]) => [n, v ? 'live' : 'offline']));
+  }
+
   async function checkOne(name) {
     for (const v of ['v2', 'v1']) {
       try {
@@ -96,22 +119,32 @@
     polling = true;
     lastPoll = Date.now();
     const names = [...new Set([...state.channels, ...state.favorites])].slice(0, 60);
-    const queue = [...names];
     const wentLive = [];
     let ok = 0;
-    await Promise.all(Array.from({ length: 4 }, async () => {
-      while (queue.length) {
-        const n = queue.shift();
-        const s = await checkOne(n);
-        if (s === 'unknown') { if (!status.has(n)) status.set(n, s); continue; }  // keep last known on a blip
-        ok++;
-        if (s === 'live' && status.get(n) === 'offline') wentLive.push(n);
-        status.set(n, s);
-      }
-    }));
+    const record = (n, s) => {
+      if (s === 'unknown') { if (!status.has(n)) status.set(n, s); return; }  // keep last known on a blip
+      ok++;
+      if (s === 'live' && status.get(n) === 'offline') wentLive.push(n);
+      status.set(n, s);
+    };
+    statusErr = '';
+    if (state.statusUrl && names.length) {
+      try {
+        const res = await checkViaWorker(names.slice(0, 50));
+        names.forEach((n) => record(n, res.get(n) || 'unknown'));
+      } catch (e) { statusErr = e.message; }
+    } else {
+      const queue = [...names];
+      await Promise.all(Array.from({ length: 4 }, async () => {
+        while (queue.length) { const n = queue.shift(); record(n, await checkOne(n)); }
+      }));
+    }
     const wasOk = statusOk;
     if (names.length) statusOk = ok > 0;
-    if (statusOk === false && wasOk !== false) toast('ตรวจสถานะออนไลน์ไม่ได้ จะแสดงทุกช่องไว้ก่อน');
+    if (statusOk === false && wasOk !== false) {
+      toast(state.statusUrl ? `ตรวจสถานะไม่ได้: ${statusErr}` : 'ตรวจสถานะไม่ได้ ต้องตั้งค่าตัวตรวจสถานะใน ☰ จัดการ');
+      if (!state.statusUrl) $('#status-setup').open = true;
+    }
     const onScreen = wentLive.filter((n) => state.channels.includes(n));
     if (onScreen.length) toast(`🟢 ${onScreen.join(', ')} เริ่มไลฟ์แล้ว`);
     polling = false;
@@ -221,10 +254,13 @@
     $('#waiting-n').textContent = state.channels.length;
     grid.hidden = !vis.length;
     $('#hide-offline').checked = state.hideOffline;
+    const live = state.channels.filter((n) => status.get(n) === 'live').length;
     $('#status-note').textContent = statusOk === false
-      ? 'ตรวจสถานะไม่ได้ (Kick ไม่อนุญาต) — แสดงทุกช่องไว้ก่อน'
-      : statusOk ? `ตรวจล่าสุด ${new Date(lastPoll).toLocaleTimeString('th-TH', { hour: '2-digit', minute: '2-digit' })} · ตรวจทุก 1 นาที`
+      ? (state.statusUrl ? `⚠️ ตรวจสถานะไม่ได้: ${statusErr} — แสดงทุกช่องไว้ก่อน`
+        : '⚠️ ตรวจสถานะไม่ได้ (Kick ไม่ให้เบราว์เซอร์ถามตรงๆ) — ตั้งค่าตัวตรวจสถานะด้านล่าง')
+      : statusOk ? `✅ ใช้ได้ · ออนไลน์ ${live}/${state.channels.length} · ตรวจล่าสุด ${new Date(lastPoll).toLocaleTimeString('th-TH', { hour: '2-digit', minute: '2-digit' })} · ตรวจทุก 1 นาที`
         : 'กำลังตรวจสถานะ…';
+    $('#status-note').classList.toggle('warn', statusOk === false);
     renderList();
     renderFavs();
     renderSets();
@@ -471,6 +507,29 @@
   $('#open-drawer').addEventListener('click', () => openPanel('#drawer'));
   $('#hide-offline').addEventListener('change', (e) => { state.hideOffline = e.target.checked; render(); });
   $('#show-offline').addEventListener('click', () => { state.hideOffline = false; render(); });
+  $('#status-form').addEventListener('submit', async (e) => {
+    e.preventDefault();
+    const raw = $('#status-url').value.trim();
+    const url = cleanUrl(raw);
+    if (raw && !url) return toast('ลิงก์ต้องขึ้นต้นด้วย https://');
+    state.statusUrl = url;
+    $('#status-url').value = url;
+    statusOk = null;
+    render();
+    await poll();
+    toast(!url ? 'ลบตัวตรวจสถานะแล้ว' : statusOk ? '✅ ตัวตรวจสถานะใช้ได้' : `❌ ${statusErr || 'ยังไม่มีช่องให้ตรวจ'}`);
+  });
+  $('#copy-worker').addEventListener('click', async () => {
+    for (const u of WORKER_CODE_URLS) {
+      try {
+        const r = await fetch(u, { cache: 'no-store' });
+        if (!r.ok) continue;
+        await navigator.clipboard.writeText(await r.text());
+        return toast('คัดลอกโค้ด Worker แล้ว นำไปวางใน Cloudflare ได้เลย');
+      } catch { /* try the next source */ }
+    }
+    window.open(WORKER_CODE_URLS[1], '_blank', 'noopener');  // copy by hand from the raw file
+  });
   $('#clear').addEventListener('click', () => {
     if (state.channels.length && confirm('ลบทุกช่องบนจอ? (ช่องโปรดและชุดที่บันทึกยังอยู่)')) { state.channels = []; closePanels(); render(); }
   });
@@ -492,6 +551,7 @@
   new ResizeObserver(layout).observe(grid);
 
   load();
+  $('#status-url').value = state.statusUrl;
   render();
   poll();
 

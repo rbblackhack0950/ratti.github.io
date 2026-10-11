@@ -58,6 +58,22 @@
       <p class="hint">🟢 ออนไลน์ · ⚫ ออฟไลน์ · ◧ จอหลัก · 🔊 เสียง · ★ ช่องโปรด · ▲▼ จัดลำดับ</p>
       <label class="toggle"><input type="checkbox" id="hide-offline"> ซ่อนช่องที่ออฟไลน์ (ขึ้นมาเองเมื่อเริ่มไลฟ์)</label>
       <p class="hint" id="status-note"></p>
+      <details id="status-setup">
+        <summary>⚙️ ตั้งค่าตัวตรวจสถานะออนไลน์</summary>
+        <p class="hint">Kick ไม่ให้เว็บอื่นถามสถานะจากเบราว์เซอร์ตรงๆ จึงต้องมีตัวกลางฟรีบน Cloudflare ทำครั้งเดียว (ประมาณ 10 นาที)</p>
+        <form id="status-form" class="row" autocomplete="off">
+          <input id="status-url" type="url" inputmode="url" placeholder="https://ชื่อ.บัญชี.workers.dev">
+          <button type="submit">บันทึก/ทดสอบ</button>
+        </form>
+        <ol class="steps">
+          <li><b>สร้างแอป Kick:</b> เปิด <a href="https://kick.com/settings/developer" target="_blank" rel="noopener">kick.com/settings/developer</a> (ต้องเปิด 2FA ในบัญชี Kick ก่อน) → Create App → ตั้งชื่ออะไรก็ได้ → Redirect URL ใส่ลิงก์หน้านี้ → บันทึก แล้วจด <b>Client ID</b> กับ <b>Client Secret</b></li>
+          <li><b>สร้าง Worker:</b> เข้า <a href="https://dash.cloudflare.com" target="_blank" rel="noopener">dash.cloudflare.com</a> (สมัครฟรี) → Workers &amp; Pages → Create → Create Worker → Deploy</li>
+          <li><b>ใส่โค้ด:</b> กดปุ่ม "คัดลอกโค้ด Worker" ด้านล่าง → ใน Cloudflare กด Edit code → ลบโค้ดเดิมทั้งหมด → วาง → Deploy</li>
+          <li><b>ใส่รหัส:</b> ที่ Worker → Settings → Variables and Secrets → Add → ชื่อ <code>KICK_CLIENT_ID</code> ใส่ Client ID และ <code>KICK_CLIENT_SECRET</code> (เลือกแบบ Secret) ใส่ Client Secret → Deploy</li>
+          <li><b>เชื่อมกับแอป:</b> คัดลอกลิงก์ <code>.workers.dev</code> ของ Worker มาวางในช่องด้านบน แล้วกด "บันทึก/ทดสอบ"</li>
+        </ol>
+        <button type="button" id="copy-worker" class="wide">📋 คัดลอกโค้ด Worker</button>
+      </details>
       <ol id="d-list"></ol>
     </section>
     <section>

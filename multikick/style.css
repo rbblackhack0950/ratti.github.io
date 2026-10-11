@@ -98,3 +98,12 @@ h3 { margin: 18px 0 4px; font-size: 15px; color: var(--fg); }
 #d-list li.dim .nm { color: var(--dim); }
 .toggle { display: flex; align-items: center; gap: 10px; min-height: 44px; font-size: 15px; cursor: pointer; }
 .toggle input { width: 22px; height: 22px; accent-color: var(--accent); }
+
+#status-note.warn { color: #ffb84d; }
+#status-setup { margin: 4px 0 8px; padding: 10px 12px; border: 1px solid var(--line); border-radius: 10px; background: var(--bg); }
+#status-setup summary { min-height: 32px; display: flex; align-items: center; font-weight: 700; cursor: pointer; }
+#status-setup[open] summary { margin-bottom: 6px; }
+.steps { margin: 10px 0 0; padding-left: 20px; font-size: 14px; line-height: 1.55; }
+.steps li { margin-bottom: 8px; }
+.steps a { color: var(--accent); }
+code { padding: 1px 5px; border-radius: 4px; background: #1e282b; font-size: 13px; }
