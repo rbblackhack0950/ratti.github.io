@@ -99,6 +99,7 @@ body.no-names .tag { visibility: hidden; }
 .tabs { flex: 1; display: flex; padding: 3px; border-radius: 12px; background: var(--bg); }
 .tabs button { flex: 1; height: 36px; border-radius: 9px; font-size: 14px; font-weight: 600; color: var(--dim); }
 .tabs button.on { background: var(--raise); color: var(--fg); }
+[data-pane=set] .tabs button.on { background: var(--accent); color: #041b00; }
 
 #sheet { position: fixed; z-index: 31; left: 50%; bottom: 0; transform: translateX(-50%); width: min(520px, 100vw);
   padding: 12px 16px calc(16px + env(safe-area-inset-bottom)); border-radius: 20px 20px 0 0;
