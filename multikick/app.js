@@ -142,7 +142,7 @@
     if (channels.length && confirm('ลบทุกช่อง?')) { channels = []; audio = maxed = null; render(true); }
   });
   $('share').addEventListener('click', async () => {
-    const url = `${location.origin}${location.pathname}?c=${channels.join(',')}`;
+    const url = `${location.href.split(/[?#]/)[0]}?c=${channels.join(',')}`;
     try { await navigator.clipboard.writeText(url); toast('คัดลอกลิงก์แล้ว'); } catch { prompt('คัดลอกลิงก์:', url); }
   });
   $('hide-bar').addEventListener('click', () => { $('bar').hidden = true; $('show-bar').hidden = false; layout(); });
