@@ -29,6 +29,7 @@
   let maxed = null;        // channel shown fullscreen
   let sheetFor = null;     // channel whose action sheet is open
   let immersive = false;   // video only: no top bar, browser fullscreen
+  let soundWaiting = false; // main screen should have sound but the page hasn't been touched yet
   const cells = new Map();
   const status = new Map(); // name -> 'live' | 'offline' | 'unknown'
   const info = new Map();   // name -> { viewers, title, category } while live (from the Worker)
@@ -75,6 +76,7 @@
   // The main screen falls back to the first visible channel while the chosen one is offline.
   const mainNow = () => { const v = visible(); return v.includes(state.main) ? state.main : v[0] || null; };
   const isLive = (n) => status.get(n) === 'live';
+  const canSound = () => !navigator.userActivation || navigator.userActivation.hasBeenActive;
 
   // One line describing a channel: viewers and title while live.
   function describe(n) {
@@ -342,9 +344,14 @@
     if (!vis.includes(maxed)) maxed = null;
 
     // Sound: in the focus layout it always follows the main screen; in the grid it is picked by hand.
-    const want = state.layout === 'focus'
+    const wanted = state.layout === 'focus'
       ? (userMuted ? null : mainNow())
       : (vis.includes(gridAudio) ? gridAudio : null);
+    // Browsers block autoplay with sound until the page has been touched; a player asked to start
+    // unmuted before that stays paused. So everything starts muted, and the sound comes on with the
+    // first touch.
+    const want = canSound() ? wanted : null;
+    soundWaiting = !!wanted && !want;
     const reloadSet = new Set(force);
     if (want !== audio) { if (audio) reloadSet.add(audio); if (want) reloadSet.add(want); audio = want; }
 
@@ -377,6 +384,7 @@
     document.querySelectorAll('[data-layout]').forEach((b) => b.classList.toggle('on', b.dataset.layout === state.layout));
     document.body.classList.toggle('no-names', !state.showNames);
     $('#chip-status').hidden = !total;
+    $('#sound-hint').hidden = !soundWaiting;
     $('#count').textContent = statusOk ? `${live}/${total}` : String(total);
     $('#chip-status').title = statusOk ? `ไลฟ์อยู่ ${live} จาก ${total} ช่อง` : `${total} ช่อง`;
     $('#bar-dot').className = `dot${statusOk && live ? ' live' : ''}`;
@@ -812,6 +820,10 @@
     if (!document.hidden && Date.now() - lastPoll > 15000) poll();
     syncWakeLock();
   });
+  // The first touch anywhere, including inside a player (focus moves into its iframe), allows sound.
+  const soundNow = () => setTimeout(() => { if (soundWaiting && canSound()) render(); }, 50);
+  for (const t of ['pointerup', 'keydown', 'click']) document.addEventListener(t, soundNow, true);
+  addEventListener('blur', soundNow);
   new ResizeObserver(layout).observe(grid);
 
   load();
