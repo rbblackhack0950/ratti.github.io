@@ -1,0 +1,8 @@
+# Cloudflare Worker "ratti-github-io": the live-status checker used by multikick/.
+# Cloudflare builds and deploys it on every push to main (Workers Builds, connected in the dashboard).
+# KICK_CLIENT_ID and KICK_CLIENT_SECRET are set as Secrets in the dashboard, not here.
+name = "ratti-github-io"
+main = "multikick/worker/kick-status-worker.js"
+compatibility_date = "2025-09-01"
+workers_dev = true
+keep_vars = true
