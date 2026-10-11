@@ -3,6 +3,16 @@
   const MAX = 25;
   const HEAVY = 9;                       // warn about bandwidth above this many streams
   const POLL_MS = 60000;                 // how often live status is re-checked
+  const LOAD_GAP_MS = 300;               // gap between starting each player
+  // Width in device pixels of each quality rung, and its rough bitrate (Mbps) on Kick.
+  const RUNG = { 160: 284, 360: 640, 480: 854, 720: 1280, 1080: 1920 };
+  const MBPS = { 160: 0.3, 360: 0.9, 480: 1.6, 720: 3.5, 1080: 7 };
+  // Quality presets: main screen, small screens (focus layout), equal grid with 2-4 / 5+ screens.
+  const QUALITY = {
+    smooth: { main: 720, small: 160, grid: [480, 360] },
+    balanced: { main: 1080, small: 360, grid: [720, 480] },
+    sharp: { main: null },
+  };
   const KEY = 'multikick.v2';
   const OLD_KEY = 'multikick.channels';  // v1 stored just the channel array
   const $ = (s) => document.querySelector(s);
@@ -11,7 +21,7 @@
   // Everything here is persisted, so reopening the app restores the same screens in the same order.
   const state = {
     channels: [], layout: 'grid', main: null, favorites: [], sets: [],
-    hideOffline: true, statusUrl: '', showNames: true, keepAwake: true, lowResSmall: true,
+    hideOffline: true, statusUrl: '', showNames: true, keepAwake: true, quality: 'balanced',
   };
   let audio = null;        // channel whose player is currently loaded unmuted
   let gridAudio = null;    // channel picked for sound in the equal-grid layout
@@ -79,9 +89,10 @@
 
   // ---------- persistence ----------
   function load() {
+    let s0 = {};
     try {
       const s = JSON.parse(localStorage.getItem(KEY));
-      if (s && typeof s === 'object') Object.assign(state, s);
+      if (s && typeof s === 'object') { Object.assign(state, s); s0 = s; }
       else state.channels = JSON.parse(localStorage.getItem(OLD_KEY)) || [];
     } catch { /* private mode or corrupt data: start empty */ }
     const q = new URLSearchParams(location.search);
@@ -98,7 +109,9 @@
     state.hideOffline = state.hideOffline !== false;
     state.showNames = state.showNames !== false;
     state.keepAwake = state.keepAwake !== false;
-    state.lowResSmall = state.lowResSmall !== false;
+    if (state.lowResSmall === false && !s0.quality) state.quality = 'sharp';  // pre-preset setting
+    if (!QUALITY[state.quality]) state.quality = 'balanced';
+    delete state.lowResSmall;
     state.statusUrl = cleanUrl(state.statusUrl);
     state.sets = (Array.isArray(state.sets) ? state.sets : [])
       .filter((s) => s && s.name)
@@ -272,20 +285,52 @@
   }
 
   // Kick's embed has no quality setting, but its player picks the stream quality from the player's
-  // size in device pixels. Small screens in the focus layout get a ~640-device-pixel-wide player
-  // (the 360p rung) scaled up to fill the tile, which leaves the bandwidth to the main screen.
-  // Resizing never reloads the stream.
+  // size in device pixels. A screen whose quality should be capped gets a player exactly as wide as
+  // that rung (e.g. 640 device px = 360p), scaled up to fill its tile. Resizing never reloads the stream.
+  function capOf(n, main, count) {
+    const q = QUALITY[state.quality];
+    if (!q.main) return null;  // 'sharp': let the player decide
+    if (n === maxed || (state.layout === 'focus' && count > 1 && n === main)) return q.main;
+    if (state.layout === 'focus' && count > 1) return q.small;
+    return count === 1 ? q.main : count <= 4 ? q.grid[0] : q.grid[1];
+  }
+  let estMbps = 0;
   function sizePlayers(main) {
-    const target = 640 / (window.devicePixelRatio || 1);
+    const dpr = window.devicePixelRatio || 1;
+    const vis = visible();
+    estMbps = 0;
     cells.forEach((c, n) => {
       const f = c.querySelector('iframe');
-      const small = state.lowResSmall && state.layout === 'focus' && n !== main && !c.classList.contains('max');
       const w = c.clientWidth, h = c.clientHeight;
-      const k = small && w > target ? w / target : 1;
-      f.style.width = k > 1 ? `${w / k}px` : '';
-      f.style.height = k > 1 ? `${h / k}px` : '';
-      f.style.transform = k > 1 ? `scale(${k})` : '';
+      const cap = vis.includes(n) ? capOf(n, main, vis.length) : null;
+      const target = cap ? Math.floor(RUNG[cap] / dpr) : Infinity;  // round down: the page rounds the player's width
+      const k = w > target ? w / target : 1;
+      const key = k > 1 ? `${w}x${h}@${k}` : '';
+      if (f.dataset.size !== key) {  // only touch the iframe when its size really changes
+        f.dataset.size = key;
+        f.style.width = k > 1 ? `${w / k}px` : '';
+        f.style.height = k > 1 ? `${h / k}px` : '';
+        f.style.transform = k > 1 ? `scale(${k})` : '';
+      }
+      if (vis.includes(n)) {
+        // Quality the player is expected to pick: the smallest rung at least as wide as the player.
+        const px = (w / k) * dpr;
+        const rung = Object.keys(RUNG).map(Number).sort((a, b) => a - b).find((r) => RUNG[r] >= px) || 1080;
+        estMbps += MBPS[rung];
+      }
     });
+  }
+
+  // Load players one after another (main screen first) instead of all at once.
+  const loadQueue = [];
+  let loadTimer = 0;
+  function pumpLoads() {
+    if (loadTimer) return;
+    const n = loadQueue.shift();
+    if (n === undefined) return;
+    const f = cells.get(n)?.querySelector('iframe');
+    if (f && f.dataset.on === '1') f.src = src(n, n !== audio);
+    loadTimer = setTimeout(() => { loadTimer = 0; pumpLoads(); }, LOAD_GAP_MS);
   }
 
   // ---------- rendering ----------
@@ -310,13 +355,21 @@
       const on = vis.includes(n);
       const f = c.querySelector('iframe');
       // Offline channels are unloaded; when they go live they load fresh, so no page refresh is needed.
-      if (on && (f.dataset.on !== '1' || reloadSet.has(n))) { f.src = src(n, n !== audio); f.dataset.on = '1'; }
-      else if (!on && f.dataset.on === '1') { f.src = 'about:blank'; f.dataset.on = '0'; }
+      if (on && f.dataset.on !== '1') { f.dataset.on = '1'; loadQueue.push(n); }
+      else if (on && reloadSet.has(n) && !loadQueue.includes(n)) f.src = src(n, n !== audio);
+      else if (!on && f.dataset.on === '1') {
+        f.src = 'about:blank';
+        f.dataset.on = '0';
+        if (loadQueue.includes(n)) loadQueue.splice(loadQueue.indexOf(n), 1);
+      }
       c.style.order = i;
       c.classList.toggle('off', !on);
       c.classList.toggle('audio', n === audio);
       c.classList.toggle('max', n === maxed);
     });
+    const first = loadQueue.indexOf(mainNow());
+    if (first > 0) loadQueue.unshift(...loadQueue.splice(first, 1));
+    pumpLoads();
     layout();
 
     const total = state.channels.length;
@@ -333,7 +386,7 @@
     $('#opt-hide-offline').checked = state.hideOffline;
     $('#opt-names').checked = state.showNames;
     $('#opt-awake').checked = state.keepAwake;
-    $('#opt-lowres').checked = state.lowResSmall;
+    renderQuality();
     renderStatus(live, total);
     renderList();
     renderFavs();
@@ -341,6 +394,15 @@
     if (sheetFor) renderSheet();
     syncWakeLock();
     save();
+  }
+
+  function renderQuality() {
+    const q = QUALITY[state.quality];
+    document.querySelectorAll('[data-quality]').forEach((b) => b.classList.toggle('on', b.dataset.quality === state.quality));
+    const est = visible().length ? ` · ตอนนี้ใช้เน็ตประมาณ ${Math.max(1, Math.round(estMbps))} Mbps` : '';
+    $('#quality-desc').textContent = (q.main
+      ? `จอหลัก ${q.main}p · จอเล็ก ${q.small}p · โหมดเท่ากัน ${q.grid[1]}–${q.grid[0]}p`
+      : 'ไม่จำกัด ให้ตัวเล่นของ Kick เลือกเอง') + est;
   }
 
   function renderStatus(live, total) {
@@ -625,6 +687,7 @@
       const s = state.sets[+d.setDel];
       if (s && confirm(`ลบชุด "${s.name}"?`)) { state.sets.splice(+d.setDel, 1); render(); }
     } else if (d.layout) setLayout(d.layout);
+    else if (d.quality) { state.quality = d.quality; render(); }
   });
   $('#backdrop').addEventListener('click', closePanels);
 
@@ -704,7 +767,6 @@
   $('#opt-hide-offline').addEventListener('change', (e) => { state.hideOffline = e.target.checked; render(); });
   $('#opt-names').addEventListener('change', (e) => { state.showNames = e.target.checked; render(); });
   $('#opt-awake').addEventListener('change', (e) => { state.keepAwake = e.target.checked; render(); });
-  $('#opt-lowres').addEventListener('change', (e) => { state.lowResSmall = e.target.checked; render(); });
   $('#show-offline').addEventListener('click', () => { state.hideOffline = false; render(); });
   $('#clear').addEventListener('click', () => {
     if (state.channels.length && confirm('ลบทุกช่องบนจอ? (ช่องโปรดและชุดที่บันทึกยังอยู่)')) { state.channels = []; closePanels(); render(); }
