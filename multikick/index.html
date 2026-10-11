@@ -40,6 +40,12 @@
     </div>
   </section>
 
+  <section id="waiting" hidden>
+    <p>🌙 ทุกช่อง (<span id="waiting-n"></span>) ออฟไลน์อยู่</p>
+    <p class="hint">ช่องจะขึ้นมาเองเมื่อเริ่มไลฟ์ ไม่ต้องรีเฟรช (ตรวจทุก 1 นาที)</p>
+    <button type="button" id="show-offline">แสดงช่องที่ออฟไลน์ด้วย</button>
+  </section>
+
   <div id="backdrop" hidden></div>
 
   <aside id="drawer" hidden aria-label="จัดการช่อง">
@@ -49,7 +55,9 @@
     </div>
     <section>
       <h3>กำลังดู <span id="d-count"></span></h3>
-      <p class="hint">◧ จอหลัก · 🔊 เสียง · ★ ช่องโปรด · ▲▼ จัดลำดับ</p>
+      <p class="hint">🟢 ออนไลน์ · ⚫ ออฟไลน์ · ◧ จอหลัก · 🔊 เสียง · ★ ช่องโปรด · ▲▼ จัดลำดับ</p>
+      <label class="toggle"><input type="checkbox" id="hide-offline"> ซ่อนช่องที่ออฟไลน์ (ขึ้นมาเองเมื่อเริ่มไลฟ์)</label>
+      <p class="hint" id="status-note"></p>
       <ol id="d-list"></ol>
     </section>
     <section>

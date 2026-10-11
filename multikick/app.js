@@ -2,17 +2,23 @@
   'use strict';
   const MAX = 25;
   const HEAVY = 9;                       // warn about bandwidth above this many streams
+  const POLL_MS = 60000;                 // how often live status is re-checked
   const KEY = 'multikick.v2';
   const OLD_KEY = 'multikick.channels';  // v1 stored just the channel array
   const $ = (s) => document.querySelector(s);
   const grid = $('#grid');
 
   // Everything here is persisted, so reopening the app restores the same screens in the same order.
-  const state = { channels: [], layout: 'grid', main: null, favorites: [], sets: [] };
-  let audio = null;     // channel with sound on (session only: browsers block unmuted autoplay)
-  let maxed = null;     // channel shown fullscreen
-  let sheetFor = null;  // channel whose action sheet is open
+  const state = { channels: [], layout: 'grid', main: null, favorites: [], sets: [], hideOffline: true };
+  let audio = null;        // channel whose player is currently loaded unmuted
+  let gridAudio = null;    // channel picked for sound in the equal-grid layout
+  let userMuted = false;   // focus layout: main screen muted with "mute all" / its sound button
+  let maxed = null;        // channel shown fullscreen
+  let sheetFor = null;     // channel whose action sheet is open
   const cells = new Map();
+  const status = new Map(); // name -> 'live' | 'offline' | 'unknown'
+  let statusOk = null;      // null: not checked yet, false: Kick could not be reached
+  let lastPoll = 0;
 
   // ---------- helpers ----------
   // Accepts "https://kick.com/name", "kick.com/name/...", "player.kick.com/name" or a bare name.
@@ -32,8 +38,14 @@
 
   function toast(msg) {
     const t = $('#toast'); t.textContent = msg; t.classList.add('on');
-    clearTimeout(toast.id); toast.id = setTimeout(() => t.classList.remove('on'), 2400);
+    clearTimeout(toast.id); toast.id = setTimeout(() => t.classList.remove('on'), 2600);
   }
+
+  // Offline channels are hidden only when their status is known; unknown ones always show.
+  const shown = (n) => !(state.hideOffline && status.get(n) === 'offline');
+  const visible = () => state.channels.filter(shown);
+  // The main screen falls back to the first visible channel while the chosen one is offline.
+  const mainNow = () => { const v = visible(); return v.includes(state.main) ? state.main : v[0] || null; };
 
   // ---------- persistence ----------
   function load() {
@@ -53,12 +65,61 @@
     state.favorites = uniq(state.favorites);
     state.layout = state.layout === 'focus' ? 'focus' : 'grid';
     state.main = parse(state.main);
+    state.hideOffline = state.hideOffline !== false;
     state.sets = (Array.isArray(state.sets) ? state.sets : [])
       .filter((s) => s && s.name)
       .map((s) => ({ name: String(s.name).slice(0, 40), channels: uniq(s.channels, MAX),
         layout: s.layout === 'focus' ? 'focus' : 'grid', main: parse(s.main) }));
   }
   function save() { try { localStorage.setItem(KEY, JSON.stringify(state)); } catch { /* storage unavailable */ } }
+
+  // ---------- live status ----------
+  // Kick's site API; if the browser can't reach it (CORS, Cloudflare) every channel stays 'unknown' and is shown.
+  async function checkOne(name) {
+    for (const v of ['v2', 'v1']) {
+      try {
+        const r = await fetch(`https://kick.com/api/${v}/channels/${encodeURIComponent(name)}`,
+          { credentials: 'omit', cache: 'no-store', headers: { Accept: 'application/json' } });
+        if (r.status === 404) return 'offline';
+        if (!r.ok) continue;
+        const ls = (await r.json())?.livestream;
+        return ls && ls.is_live !== false ? 'live' : 'offline';
+      } catch { /* try the next endpoint */ }
+    }
+    return 'unknown';
+  }
+
+  let polling = false, pollAgain = false, pollTimer = 0;
+  async function poll() {
+    clearTimeout(pollTimer);
+    if (polling) { pollAgain = true; return; }
+    polling = true;
+    lastPoll = Date.now();
+    const names = [...new Set([...state.channels, ...state.favorites])].slice(0, 60);
+    const queue = [...names];
+    const wentLive = [];
+    let ok = 0;
+    await Promise.all(Array.from({ length: 4 }, async () => {
+      while (queue.length) {
+        const n = queue.shift();
+        const s = await checkOne(n);
+        if (s === 'unknown') { if (!status.has(n)) status.set(n, s); continue; }  // keep last known on a blip
+        ok++;
+        if (s === 'live' && status.get(n) === 'offline') wentLive.push(n);
+        status.set(n, s);
+      }
+    }));
+    const wasOk = statusOk;
+    if (names.length) statusOk = ok > 0;
+    if (statusOk === false && wasOk !== false) toast('ตรวจสถานะออนไลน์ไม่ได้ จะแสดงทุกช่องไว้ก่อน');
+    const onScreen = wentLive.filter((n) => state.channels.includes(n));
+    if (onScreen.length) toast(`🟢 ${onScreen.join(', ')} เริ่มไลฟ์แล้ว`);
+    polling = false;
+    render();
+    if (pollAgain) { pollAgain = false; poll(); return; }
+    pollTimer = setTimeout(poll, statusOk === false ? POLL_MS * 3 : POLL_MS);
+  }
+  const pollSoon = () => { clearTimeout(pollTimer); pollTimer = setTimeout(poll, 400); };
 
   // ---------- video cells ----------
   // A cell's iframe is never moved in the DOM (moving reloads the stream);
@@ -68,8 +129,9 @@
     more.dataset.name = name;
     const exit = el('button', { type: 'button', className: 'exit-max', textContent: 'ออกจากเต็มจอ ✕' });
     exit.dataset.name = name;
-    const frame = el('iframe', { title: name, src: src(name, true), allowFullscreen: true, referrerPolicy: 'no-referrer' });
+    const frame = el('iframe', { title: name, allowFullscreen: true, referrerPolicy: 'no-referrer' });
     frame.allow = 'autoplay; fullscreen; picture-in-picture';
+    frame.dataset.on = '0';  // render() loads it
     const cell = el('div', { className: 'cell' },
       frame,
       el('div', { className: 'ov' }, el('span', { className: 'tag' }, el('span', { className: 'snd-ic', textContent: '🔊 ' }), name), more),
@@ -77,12 +139,11 @@
     cell.dataset.name = name;
     return cell;
   }
-  const frameOf = (name) => cells.get(name)?.querySelector('iframe');
-  const reload = (name) => { const f = frameOf(name); if (f) f.src = src(name, name !== audio); };
 
   // Picks the arrangement that shows the most 16:9 video.
   function layout() {
-    const n = state.channels.length;
+    const vis = visible();
+    const n = vis.length, main = mainNow();
     const W = grid.clientWidth - 8, H = grid.clientHeight - 8;
     cells.forEach((c) => { c.style.gridColumn = ''; c.style.gridRow = ''; });
     if (!n || W <= 0 || H <= 0) return;
@@ -115,31 +176,55 @@
     grid.style.gridTemplateColumns = `repeat(${best.C}, minmax(0, 1fr))`;
     grid.style.gridTemplateRows = `repeat(${best.R}, minmax(0, 1fr))`;
     if (best.a) {
-      const m = cells.get(state.main);
+      const m = cells.get(main);
       m.style.gridColumn = `1 / span ${best.a}`;
       m.style.gridRow = `1 / span ${best.b}`;
     }
   }
 
   // ---------- rendering ----------
-  function render() {
+  // `force` lists channels whose player must be reloaded even if nothing else changed.
+  function render(force = []) {
     if (!state.channels.includes(state.main)) state.main = state.channels[0] || null;
-    if (!state.channels.includes(audio)) audio = null;
-    if (!state.channels.includes(maxed)) maxed = null;
+    const vis = visible();
+    if (!vis.includes(maxed)) maxed = null;
+
+    // Sound: in the focus layout it always follows the main screen; in the grid it is picked by hand.
+    const want = state.layout === 'focus'
+      ? (userMuted ? null : mainNow())
+      : (vis.includes(gridAudio) ? gridAudio : null);
+    const reloadSet = new Set(force);
+    if (want !== audio) { if (audio) reloadSet.add(audio); if (want) reloadSet.add(want); audio = want; }
+
     for (const [n, c] of cells) if (!state.channels.includes(n)) { c.remove(); cells.delete(n); }
     state.channels.forEach((n, i) => {
       let c = cells.get(n);
       if (!c) { c = makeCell(n); cells.set(n, c); grid.appendChild(c); }
+      const on = vis.includes(n);
+      const f = c.querySelector('iframe');
+      // Offline channels are unloaded; when they go live they load fresh, so no page refresh is needed.
+      if (on && (f.dataset.on !== '1' || reloadSet.has(n))) { f.src = src(n, n !== audio); f.dataset.on = '1'; }
+      else if (!on && f.dataset.on === '1') { f.src = 'about:blank'; f.dataset.on = '0'; }
       c.style.order = i;
+      c.classList.toggle('off', !on);
       c.classList.toggle('audio', n === audio);
       c.classList.toggle('max', n === maxed);
     });
     layout();
+
+    const hidden = state.channels.length - vis.length;
     document.querySelectorAll('[data-layout]').forEach((b) => b.classList.toggle('on', b.dataset.layout === state.layout));
-    $('#count').textContent = `${state.channels.length}/${MAX}`;
+    $('#count').textContent = `${state.channels.length}/${MAX}${hidden ? ` · ซ่อน ${hidden}` : ''}`;
     $('#d-count').textContent = `(${state.channels.length}/${MAX})`;
     $('#empty').hidden = state.channels.length > 0;
-    grid.hidden = !state.channels.length;
+    $('#waiting').hidden = !(state.channels.length && !vis.length);
+    $('#waiting-n').textContent = state.channels.length;
+    grid.hidden = !vis.length;
+    $('#hide-offline').checked = state.hideOffline;
+    $('#status-note').textContent = statusOk === false
+      ? 'ตรวจสถานะไม่ได้ (Kick ไม่อนุญาต) — แสดงทุกช่องไว้ก่อน'
+      : statusOk ? `ตรวจล่าสุด ${new Date(lastPoll).toLocaleTimeString('th-TH', { hour: '2-digit', minute: '2-digit' })} · ตรวจทุก 1 นาที`
+        : 'กำลังตรวจสถานะ…';
     renderList();
     renderFavs();
     renderSets();
@@ -152,15 +237,18 @@
     b.dataset.act = act; b.dataset.name = name;
     return b;
   }
+  const DOT_TITLE = { live: 'ออนไลน์', offline: 'ออฟไลน์', unknown: 'ไม่ทราบสถานะ' };
+  const dot = (n) => el('span', { className: `dot ${status.get(n) || 'unknown'}`, title: DOT_TITLE[status.get(n) || 'unknown'] });
 
   function renderList() {
     const list = $('#d-list'); list.textContent = '';
-    const last = state.channels.length - 1;
+    const last = state.channels.length - 1, main = mainNow();
     state.channels.forEach((n, i) => {
-      list.append(el('li', {},
+      list.append(el('li', { className: shown(n) ? '' : 'dim' },
         el('span', { className: 'idx', textContent: i + 1 }),
+        dot(n),
         el('span', { className: 'nm', textContent: n }),
-        iconBtn('main', n, '◧', 'ตั้งเป็นจอหลัก', state.layout === 'focus' && n === state.main),
+        iconBtn('main', n, '◧', 'ตั้งเป็นจอหลัก', state.layout === 'focus' && n === main),
         iconBtn('sound', n, n === audio ? '🔊' : '🔈', 'เปิด/ปิดเสียง', n === audio),
         iconBtn('fav', n, state.favorites.includes(n) ? '★' : '☆', 'ช่องโปรด'),
         iconBtn('left', n, '▲', 'เลื่อนขึ้น', false, i === 0),
@@ -173,7 +261,7 @@
   function favChips(box) {
     box.textContent = '';
     for (const n of state.favorites) {
-      const t = el('button', { type: 'button', textContent: n, title: 'เปิด/ปิดบนจอ' }); t.dataset.favToggle = n;
+      const t = el('button', { type: 'button', title: 'เปิด/ปิดบนจอ' }, dot(n), n); t.dataset.favToggle = n;
       const x = el('button', { type: 'button', className: 'x', textContent: '✕', title: 'เอาออกจากช่องโปรด' }); x.dataset.favDel = n;
       box.append(el('span', { className: `chip${state.channels.includes(n) ? ' on' : ''}` }, t, x));
     }
@@ -208,7 +296,8 @@
     if (!state.channels.includes(n)) return closePanels();
     $('#sheet-title').textContent = n;
     $('#sheet').querySelectorAll('[data-act]').forEach((b) => { b.dataset.name = n; });
-    $('#sheet [data-act="sound"]').textContent = n === audio ? '🔇 ปิดเสียงช่องนี้' : '🔊 เปิดเสียงช่องนี้';
+    $('#sheet [data-act="sound"]').textContent = n === audio ? '🔇 ปิดเสียงช่องนี้'
+      : state.layout === 'focus' && n !== mainNow() ? '🔊 ฟังช่องนี้ (ย้ายเป็นจอหลัก)' : '🔊 เปิดเสียงช่องนี้';
     $('#sheet [data-act="fav"]').textContent = state.favorites.includes(n) ? '★ เอาออกจากช่องโปรด' : '☆ เพิ่มเป็นช่องโปรด';
     $('#sheet [data-act="max"]').textContent = n === maxed ? '⛶ ออกจากเต็มจอ' : '⛶ เต็มจอ';
     const i = state.channels.indexOf(n);
@@ -227,7 +316,7 @@
       else if (state.channels.length >= MAX) full++;
       else { state.channels.push(n); added++; }
     }
-    if (added) render();
+    if (added) { render(); pollSoon(); }
     const notes = [];
     if (added) notes.push(`เพิ่ม ${added} ช่อง`);
     if (dup) notes.push(`มีอยู่แล้ว ${dup}`);
@@ -237,21 +326,40 @@
     if (notes.length) toast(notes.join(' · '));
   }
 
+  function setMain(name) {
+    state.main = name;
+    state.layout = 'focus';
+    userMuted = false;
+    maxed = null;
+    render();
+  }
+
   function setAudio(name) {
-    const prev = audio;
-    audio = prev === name ? null : name;
-    if (prev) reload(prev);
-    if (audio) reload(audio);
+    if (state.layout === 'focus') {
+      if (name !== mainNow()) return setMain(name);  // only the main screen has sound in this layout
+      userMuted = audio === name;
+    } else {
+      gridAudio = gridAudio === name ? null : name;
+    }
+    render();
+  }
+
+  function setLayout(l) {
+    if (l === state.layout) return;
+    if (l === 'focus') userMuted = false;
+    else gridAudio = audio;  // keep the sound that was playing
+    state.layout = l;
+    maxed = null;
     render();
   }
 
   // Reloads every player muted: also silences channels unmuted from inside Kick's own player.
   function muteAll() {
     if (!state.channels.length) return;
-    audio = null;
-    state.channels.forEach(reload);
-    render();
-    toast('ปิดเสียงทุกช่องแล้ว');
+    userMuted = true;
+    gridAudio = null;
+    render(visible());
+    toast(state.layout === 'focus' ? 'ปิดเสียงทุกช่องแล้ว (เปลี่ยนจอหลักเพื่อเปิดเสียงอีกครั้ง)' : 'ปิดเสียงทุกช่องแล้ว');
   }
 
   function move(name, d) {
@@ -276,12 +384,12 @@
   function act(action, name) {
     switch (action) {
       case 'sound': setAudio(name); break;
-      case 'main': state.main = name; state.layout = 'focus'; maxed = null; render(); break;
+      case 'main': setMain(name); break;
       case 'max': maxed = maxed === name ? null : name; closePanels(); render(); break;
-      case 'fav': toggleFav(name); break;
+      case 'fav': toggleFav(name); if (state.favorites.includes(name)) pollSoon(); break;
       case 'left': move(name, -1); break;
       case 'right': move(name, 1); break;
-      case 'reload': reload(name); toast(`โหลด ${name} ใหม่`); break;
+      case 'reload': render([name]); toast(`โหลด ${name} ใหม่`); break;
       case 'chat': window.open(`https://kick.com/popout/${name}/chat`, '_blank', 'noopener'); break;
       case 'open': window.open(`https://kick.com/${name}`, '_blank', 'noopener'); break;
       case 'rm': remove(name); break;
@@ -302,9 +410,11 @@
   function loadSet(i) {
     const s = state.sets[i]; if (!s) return;
     Object.assign(state, { channels: [...s.channels], layout: s.layout, main: s.main });
+    userMuted = false;
     maxed = null;
     closePanels();
     render();
+    pollSoon();
     toast(`เปิดชุด "${s.name}"`);
   }
 
@@ -337,7 +447,7 @@
     else if (d.setDel) {
       const s = state.sets[+d.setDel];
       if (s && confirm(`ลบชุด "${s.name}"?`)) { state.sets.splice(+d.setDel, 1); render(); }
-    } else if (d.layout) { state.layout = d.layout; maxed = null; render(); }
+    } else if (d.layout) setLayout(d.layout);
   });
   $('#backdrop').addEventListener('click', closePanels);
 
@@ -353,11 +463,14 @@
     state.favorites.push(...names);
     $('#fav-input').value = '';
     render();
+    pollSoon();
   });
   $('#fav-all').addEventListener('click', () => add(state.favorites.join(' ')));
   $('#set-save').addEventListener('click', saveSet);
   $('#mute-all').addEventListener('click', muteAll);
   $('#open-drawer').addEventListener('click', () => openPanel('#drawer'));
+  $('#hide-offline').addEventListener('change', (e) => { state.hideOffline = e.target.checked; render(); });
+  $('#show-offline').addEventListener('click', () => { state.hideOffline = false; render(); });
   $('#clear').addEventListener('click', () => {
     if (state.channels.length && confirm('ลบทุกช่องบนจอ? (ช่องโปรดและชุดที่บันทึกยังอยู่)')) { state.channels = []; closePanels(); render(); }
   });
@@ -374,10 +487,13 @@
     if (!$('#backdrop').hidden) closePanels();
     else if (maxed) { maxed = null; render(); }
   });
+  // Coming back to the app (switching apps, waking the tablet) re-checks right away.
+  document.addEventListener('visibilitychange', () => { if (!document.hidden && Date.now() - lastPoll > 15000) poll(); });
   new ResizeObserver(layout).observe(grid);
 
   load();
   render();
+  poll();
 
   if ('serviceWorker' in navigator && (location.protocol === 'https:' || location.hostname === 'localhost')) navigator.serviceWorker.register('sw.js').catch(() => {});
 })();
