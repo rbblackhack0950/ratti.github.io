@@ -14,19 +14,85 @@
   <header id="bar">
     <form id="add-form" autocomplete="off">
       <input id="add-input" type="text" inputmode="url" placeholder="วางลิงก์ Kick หรือชื่อช่อง (วางหลายอันได้)" aria-label="ลิงก์หรือชื่อช่อง">
-      <button type="submit">เพิ่ม</button>
+      <button type="submit" class="primary">เพิ่ม</button>
     </form>
-    <div class="actions">
-      <span id="count">0/8</span>
-      <button id="share" type="button" title="คัดลอกลิงก์ที่แชร์ได้">แชร์</button>
-      <button id="clear" type="button" title="ลบทุกช่อง">ล้าง</button>
-      <button id="hide-bar" type="button" title="ซ่อนแถบ">▲</button>
+    <div class="seg" role="group" aria-label="รูปแบบการจัดจอ">
+      <button type="button" data-layout="grid" title="ทุกจอขนาดเท่ากัน">⊞<span class="lbl"> เท่ากัน</span></button>
+      <button type="button" data-layout="focus" title="จอหลัก 1 จอ + จอเล็ก">◧<span class="lbl"> จอหลัก</span></button>
     </div>
+    <button type="button" id="mute-all" title="ปิดเสียงทุกช่อง">🔇<span class="lbl"> ปิดเสียงทั้งหมด</span></button>
+    <button type="button" id="open-drawer" title="จัดการช่อง ช่องโปรด และชุดที่บันทึก">☰<span class="lbl"> จัดการ</span> <span id="count">0/25</span></button>
+    <button type="button" id="hide-bar" title="ซ่อนแถบด้านบน">▲</button>
   </header>
-  <button id="show-bar" type="button" hidden>▼</button>
+  <button type="button" id="show-bar" hidden title="แสดงแถบด้านบน">▼</button>
 
   <main id="grid"></main>
-  <p id="empty">วางลิงก์ช่อง Kick ด้านบนเพื่อเริ่มดู (สูงสุด 8 ช่อง)</p>
+
+  <section id="empty" hidden>
+    <p>วางลิงก์ช่อง Kick ด้านบนเพื่อเริ่มดู (สูงสุด 25 ช่อง)</p>
+    <div class="quick" id="empty-favs-wrap">
+      <h3>ช่องโปรด</h3>
+      <div class="chips" id="empty-favs"></div>
+    </div>
+    <div class="quick" id="empty-sets-wrap">
+      <h3>ชุดที่บันทึกไว้</h3>
+      <ul class="sets" id="empty-sets"></ul>
+    </div>
+  </section>
+
+  <div id="backdrop" hidden></div>
+
+  <aside id="drawer" hidden aria-label="จัดการช่อง">
+    <div class="panel-head">
+      <strong>จัดการช่อง</strong>
+      <button type="button" data-close>✕</button>
+    </div>
+    <section>
+      <h3>กำลังดู <span id="d-count"></span></h3>
+      <p class="hint">◧ จอหลัก · 🔊 เสียง · ★ ช่องโปรด · ▲▼ จัดลำดับ</p>
+      <ol id="d-list"></ol>
+    </section>
+    <section>
+      <h3>ช่องโปรด</h3>
+      <p class="hint">แตะชื่อเพื่อเปิด/ปิดบนจอ</p>
+      <div class="chips" id="fav-list"></div>
+      <form id="fav-form" class="row" autocomplete="off">
+        <input id="fav-input" type="text" inputmode="url" placeholder="เพิ่มช่องโปรด (ลิงก์หรือชื่อ)">
+        <button type="submit">เพิ่ม</button>
+      </form>
+      <button type="button" id="fav-all" class="wide">เปิดช่องโปรดทั้งหมด</button>
+    </section>
+    <section>
+      <h3>ชุดที่บันทึกไว้</h3>
+      <p class="hint">บันทึกรายการช่อง ลำดับ และรูปแบบจอไว้เปิดทีหลัง</p>
+      <button type="button" id="set-save" class="wide">💾 บันทึกชุดที่ดูอยู่</button>
+      <ul class="sets" id="set-list"></ul>
+    </section>
+    <section class="foot">
+      <button type="button" id="share" class="wide">🔗 คัดลอกลิงก์แชร์</button>
+      <button type="button" id="clear" class="wide danger">ลบทุกช่องบนจอ</button>
+    </section>
+  </aside>
+
+  <div id="sheet" hidden role="dialog" aria-labelledby="sheet-title">
+    <div class="panel-head">
+      <strong id="sheet-title"></strong>
+      <button type="button" data-close>✕</button>
+    </div>
+    <div class="sheet-grid">
+      <button type="button" data-act="sound"></button>
+      <button type="button" data-act="main">◧ ตั้งเป็นจอหลัก</button>
+      <button type="button" data-act="max">⛶ เต็มจอ</button>
+      <button type="button" data-act="fav"></button>
+      <button type="button" data-act="left">◀ ย้ายไปก่อนหน้า</button>
+      <button type="button" data-act="right">▶ ย้ายไปถัดไป</button>
+      <button type="button" data-act="reload">↻ โหลดใหม่</button>
+      <button type="button" data-act="chat">💬 เปิดแชท</button>
+      <button type="button" data-act="open">↗ เปิดใน Kick</button>
+      <button type="button" data-act="rm" class="danger">✕ ลบช่องนี้</button>
+    </div>
+  </div>
+
   <div id="toast" role="status"></div>
 
   <script src="app.js"></script>
