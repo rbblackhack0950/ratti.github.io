@@ -11,7 +11,7 @@
   // Everything here is persisted, so reopening the app restores the same screens in the same order.
   const state = {
     channels: [], layout: 'grid', main: null, favorites: [], sets: [],
-    hideOffline: true, statusUrl: '', showNames: true, keepAwake: true,
+    hideOffline: true, statusUrl: '', showNames: true, keepAwake: true, lowResSmall: true,
   };
   let audio = null;        // channel whose player is currently loaded unmuted
   let gridAudio = null;    // channel picked for sound in the equal-grid layout
@@ -98,6 +98,7 @@
     state.hideOffline = state.hideOffline !== false;
     state.showNames = state.showNames !== false;
     state.keepAwake = state.keepAwake !== false;
+    state.lowResSmall = state.lowResSmall !== false;
     state.statusUrl = cleanUrl(state.statusUrl);
     state.sets = (Array.isArray(state.sets) ? state.sets : [])
       .filter((s) => s && s.name)
@@ -267,6 +268,24 @@
       m.style.gridColumn = `1 / span ${best.a}`;
       m.style.gridRow = `1 / span ${best.b}`;
     }
+    sizePlayers(main);
+  }
+
+  // Kick's embed has no quality setting, but its player picks the stream quality from the player's
+  // size in device pixels. Small screens in the focus layout get a ~640-device-pixel-wide player
+  // (the 360p rung) scaled up to fill the tile, which leaves the bandwidth to the main screen.
+  // Resizing never reloads the stream.
+  function sizePlayers(main) {
+    const target = 640 / (window.devicePixelRatio || 1);
+    cells.forEach((c, n) => {
+      const f = c.querySelector('iframe');
+      const small = state.lowResSmall && state.layout === 'focus' && n !== main && !c.classList.contains('max');
+      const w = c.clientWidth, h = c.clientHeight;
+      const k = small && w > target ? w / target : 1;
+      f.style.width = k > 1 ? `${w / k}px` : '';
+      f.style.height = k > 1 ? `${h / k}px` : '';
+      f.style.transform = k > 1 ? `scale(${k})` : '';
+    });
   }
 
   // ---------- rendering ----------
@@ -314,6 +333,7 @@
     $('#opt-hide-offline').checked = state.hideOffline;
     $('#opt-names').checked = state.showNames;
     $('#opt-awake').checked = state.keepAwake;
+    $('#opt-lowres').checked = state.lowResSmall;
     renderStatus(live, total);
     renderList();
     renderFavs();
@@ -684,6 +704,7 @@
   $('#opt-hide-offline').addEventListener('change', (e) => { state.hideOffline = e.target.checked; render(); });
   $('#opt-names').addEventListener('change', (e) => { state.showNames = e.target.checked; render(); });
   $('#opt-awake').addEventListener('change', (e) => { state.keepAwake = e.target.checked; render(); });
+  $('#opt-lowres').addEventListener('change', (e) => { state.lowResSmall = e.target.checked; render(); });
   $('#show-offline').addEventListener('click', () => { state.hideOffline = false; render(); });
   $('#clear').addEventListener('click', () => {
     if (state.channels.length && confirm('ลบทุกช่องบนจอ? (ช่องโปรดและชุดที่บันทึกยังอยู่)')) { state.channels = []; closePanels(); render(); }
