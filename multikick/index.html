@@ -11,109 +11,153 @@
   <link rel="stylesheet" href="style.css">
 </head>
 <body>
+  <svg width="0" height="0" style="position:absolute" aria-hidden="true">
+    <defs>
+      <symbol id="i-plus" viewBox="0 0 24 24"><path d="M12 5v14M5 12h14"/></symbol>
+      <symbol id="i-grid" viewBox="0 0 24 24"><rect x="3" y="3" width="7.5" height="7.5" rx="1.5"/><rect x="13.5" y="3" width="7.5" height="7.5" rx="1.5"/><rect x="3" y="13.5" width="7.5" height="7.5" rx="1.5"/><rect x="13.5" y="13.5" width="7.5" height="7.5" rx="1.5"/></symbol>
+      <symbol id="i-focus" viewBox="0 0 24 24"><rect x="3" y="3" width="18" height="12" rx="1.5"/><rect x="3" y="18" width="5" height="3" rx="1"/><rect x="9.5" y="18" width="5" height="3" rx="1"/><rect x="16" y="18" width="5" height="3" rx="1"/></symbol>
+      <symbol id="i-vol" viewBox="0 0 24 24"><path d="M11 5 6 9H3v6h3l5 4z"/><path d="M15.5 8.5a5 5 0 0 1 0 7M18.5 5.5a9 9 0 0 1 0 13"/></symbol>
+      <symbol id="i-mute" viewBox="0 0 24 24"><path d="M11 5 6 9H3v6h3l5 4z"/><path d="m16 9 6 6m0-6-6 6"/></symbol>
+      <symbol id="i-expand" viewBox="0 0 24 24"><path d="M8 3H5a2 2 0 0 0-2 2v3m18 0V5a2 2 0 0 0-2-2h-3M3 16v3a2 2 0 0 0 2 2h3m8 0h3a2 2 0 0 0 2-2v-3"/></symbol>
+      <symbol id="i-shrink" viewBox="0 0 24 24"><path d="M8 3v3a2 2 0 0 1-2 2H3m18 0h-3a2 2 0 0 1-2-2V3M3 16h3a2 2 0 0 1 2 2v3m8 0v-3a2 2 0 0 1 2-2h3"/></symbol>
+      <symbol id="i-menu" viewBox="0 0 24 24"><path d="M4 7h16M4 12h16M4 17h16"/></symbol>
+      <symbol id="i-more" viewBox="0 0 24 24"><circle cx="5" cy="12" r="1.6" fill="currentColor" stroke="none"/><circle cx="12" cy="12" r="1.6" fill="currentColor" stroke="none"/><circle cx="19" cy="12" r="1.6" fill="currentColor" stroke="none"/></symbol>
+      <symbol id="i-star" viewBox="0 0 24 24"><path d="m12 2.8 2.9 5.9 6.4.9-4.7 4.6 1.1 6.4L12 17.6l-5.7 3 1.1-6.4-4.7-4.6 6.4-.9z"/></symbol>
+      <symbol id="i-star-on" viewBox="0 0 24 24"><path fill="currentColor" d="m12 2.8 2.9 5.9 6.4.9-4.7 4.6 1.1 6.4L12 17.6l-5.7 3 1.1-6.4-4.7-4.6 6.4-.9z"/></symbol>
+      <symbol id="i-chat" viewBox="0 0 24 24"><path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z"/></symbol>
+      <symbol id="i-external" viewBox="0 0 24 24"><path d="M15 3h6v6M10 14 21 3M18 13v6a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h6"/></symbol>
+      <symbol id="i-refresh" viewBox="0 0 24 24"><path d="M21 12a9 9 0 1 1-2.6-6.4M21 3v6h-6"/></symbol>
+      <symbol id="i-trash" viewBox="0 0 24 24"><path d="M3 6h18M8 6V4h8v2m3 0-1 14a2 2 0 0 1-2 2H8a2 2 0 0 1-2-2L5 6"/></symbol>
+      <symbol id="i-close" viewBox="0 0 24 24"><path d="M6 6l12 12M18 6 6 18"/></symbol>
+      <symbol id="i-grip" viewBox="0 0 24 24"><circle cx="9" cy="6" r="1.5" fill="currentColor" stroke="none"/><circle cx="15" cy="6" r="1.5" fill="currentColor" stroke="none"/><circle cx="9" cy="12" r="1.5" fill="currentColor" stroke="none"/><circle cx="15" cy="12" r="1.5" fill="currentColor" stroke="none"/><circle cx="9" cy="18" r="1.5" fill="currentColor" stroke="none"/><circle cx="15" cy="18" r="1.5" fill="currentColor" stroke="none"/></symbol>
+      <symbol id="i-link" viewBox="0 0 24 24"><path d="M10 13a5 5 0 0 0 7.5.5l3-3a5 5 0 0 0-7-7L12 5m2 6a5 5 0 0 0-7.5-.5l-3 3a5 5 0 0 0 7 7L12 19"/></symbol>
+      <symbol id="i-save" viewBox="0 0 24 24"><path d="m19 21-7-5-7 5V5a2 2 0 0 1 2-2h10a2 2 0 0 1 2 2z"/></symbol>
+      <symbol id="i-eye" viewBox="0 0 24 24"><path d="M2 12s3.5-7 10-7 10 7 10 7-3.5 7-10 7S2 12 2 12z"/><circle cx="12" cy="12" r="3"/></symbol>
+    </defs>
+  </svg>
+
   <header id="bar">
-    <form id="add-form" autocomplete="off">
-      <input id="add-input" type="text" inputmode="url" placeholder="วางลิงก์ Kick หรือชื่อช่อง (วางหลายอันได้)" aria-label="ลิงก์หรือชื่อช่อง">
-      <button type="submit" class="primary">เพิ่ม</button>
-    </form>
+    <button type="button" id="btn-add" class="pill primary" data-open="#addpop"><svg class="ic"><use href="#i-plus"/></svg><span>เพิ่มช่อง</span></button>
+    <button type="button" id="chip-status" class="pill ghost" data-open="#drawer" data-tab="ch" title="ช่องที่ไลฟ์ / ทั้งหมด"><span class="dot" id="bar-dot"></span><span id="count">0</span></button>
+    <span class="grow"></span>
     <div class="seg" role="group" aria-label="รูปแบบการจัดจอ">
-      <button type="button" data-layout="grid" title="ทุกจอขนาดเท่ากัน">⊞<span class="lbl"> เท่ากัน</span></button>
-      <button type="button" data-layout="focus" title="จอหลัก 1 จอ + จอเล็ก">◧<span class="lbl"> จอหลัก</span></button>
+      <button type="button" class="ib" data-layout="grid" title="ทุกจอขนาดเท่ากัน"><svg class="ic"><use href="#i-grid"/></svg></button>
+      <button type="button" class="ib" data-layout="focus" title="จอหลัก 1 จอ + จอเล็ก"><svg class="ic"><use href="#i-focus"/></svg></button>
     </div>
-    <button type="button" id="mute-all" title="ปิดเสียงทุกช่อง">🔇<span class="lbl"> ปิดเสียงทั้งหมด</span></button>
-    <button type="button" id="open-drawer" title="จัดการช่อง ช่องโปรด และชุดที่บันทึก">☰<span class="lbl"> จัดการ</span> <span id="count">0/25</span></button>
-    <button type="button" id="hide-bar" title="ซ่อนแถบด้านบน">▲</button>
+    <button type="button" class="ib" id="mute-all" title="ปิดเสียงทุกช่อง"><svg class="ic"><use href="#i-mute"/></svg></button>
+    <button type="button" class="ib" id="immersive" title="โหมดดูเต็มจอ"><svg class="ic"><use href="#i-expand"/></svg></button>
+    <button type="button" class="ib" data-open="#drawer" title="เมนู"><svg class="ic"><use href="#i-menu"/></svg></button>
   </header>
-  <button type="button" id="show-bar" hidden title="แสดงแถบด้านบน">▼</button>
+  <button type="button" id="exit-immersive" class="ib float" title="ออกจากโหมดเต็มจอ"><svg class="ic"><use href="#i-shrink"/></svg></button>
 
   <main id="grid"></main>
 
-  <section id="empty" hidden>
-    <p>วางลิงก์ช่อง Kick ด้านบนเพื่อเริ่มดู (สูงสุด 25 ช่อง)</p>
-    <div class="quick" id="empty-favs-wrap">
-      <h3>ช่องโปรด</h3>
-      <div class="chips" id="empty-favs"></div>
-    </div>
-    <div class="quick" id="empty-sets-wrap">
-      <h3>ชุดที่บันทึกไว้</h3>
-      <ul class="sets" id="empty-sets"></ul>
-    </div>
+  <section id="empty" class="center" hidden>
+    <svg class="hero" viewBox="0 0 24 24"><use href="#i-grid"/></svg>
+    <h2>ดู Kick หลายช่องพร้อมกัน</h2>
+    <form id="empty-form" class="row" autocomplete="off">
+      <input id="empty-input" type="text" inputmode="url" placeholder="วางลิงก์ Kick หรือชื่อช่อง">
+      <button type="submit" class="primary">เพิ่ม</button>
+    </form>
+    <p class="hint">วางได้หลายลิงก์พร้อมกัน · สูงสุด 25 ช่อง</p>
+    <div class="quick" id="empty-favs-wrap"><h4>ช่องโปรด</h4><div class="chips" id="empty-favs"></div></div>
+    <div class="quick" id="empty-sets-wrap"><h4>ชุดที่บันทึก</h4><ul class="sets" id="empty-sets"></ul></div>
   </section>
 
-  <section id="waiting" hidden>
-    <p>🌙 ทุกช่อง (<span id="waiting-n"></span>) ออฟไลน์อยู่</p>
-    <p class="hint">ช่องจะขึ้นมาเองเมื่อเริ่มไลฟ์ ไม่ต้องรีเฟรช (ตรวจทุก 1 นาที)</p>
-    <button type="button" id="show-offline">แสดงช่องที่ออฟไลน์ด้วย</button>
+  <section id="waiting" class="center" hidden>
+    <h2>ทุกช่องออฟไลน์อยู่</h2>
+    <p class="hint">ช่องจะขึ้นมาเองเมื่อเริ่มไลฟ์ ไม่ต้องรีเฟรช</p>
+    <button type="button" id="show-offline" class="pill ghost">แสดงช่องที่ออฟไลน์</button>
   </section>
 
   <div id="backdrop" hidden></div>
 
-  <aside id="drawer" hidden aria-label="จัดการช่อง">
-    <div class="panel-head">
-      <strong>จัดการช่อง</strong>
-      <button type="button" data-close>✕</button>
+  <div id="addpop" class="pop" hidden>
+    <form id="add-form" class="row" autocomplete="off">
+      <input id="add-input" type="text" inputmode="url" placeholder="วางลิงก์ Kick หรือชื่อช่อง" aria-label="ลิงก์หรือชื่อช่อง">
+      <button type="submit" class="primary">เพิ่ม</button>
+    </form>
+    <p class="hint">วางได้หลายลิงก์พร้อมกัน · สูงสุด 25 ช่อง</p>
+    <div id="add-favs-wrap"><h4>ช่องโปรด</h4><div class="chips" id="add-favs"></div></div>
+    <div id="add-sets-wrap"><h4>ชุดที่บันทึก</h4><ul class="sets" id="add-sets"></ul></div>
+  </div>
+
+  <aside id="drawer" hidden aria-label="เมนู">
+    <div class="drawer-head">
+      <div class="tabs" role="tablist">
+        <button type="button" role="tab" data-tab="ch">ช่อง</button>
+        <button type="button" role="tab" data-tab="lib">โปรด &amp; ชุด</button>
+        <button type="button" role="tab" data-tab="set">ตั้งค่า</button>
+      </div>
+      <button type="button" class="ib" data-close title="ปิด"><svg class="ic"><use href="#i-close"/></svg></button>
     </div>
-    <section>
-      <h3>กำลังดู <span id="d-count"></span></h3>
-      <p class="hint">🟢 ออนไลน์ · ⚫ ออฟไลน์ · ◧ จอหลัก · 🔊 เสียง · ★ ช่องโปรด · ▲▼ จัดลำดับ</p>
-      <label class="toggle"><input type="checkbox" id="hide-offline"> ซ่อนช่องที่ออฟไลน์ (ขึ้นมาเองเมื่อเริ่มไลฟ์)</label>
-      <p class="hint" id="status-note"></p>
-      <details id="status-setup">
-        <summary>⚙️ ตั้งค่าตัวตรวจสถานะออนไลน์</summary>
-        <p class="hint">Kick ไม่ให้เว็บอื่นถามสถานะจากเบราว์เซอร์ตรงๆ จึงต้องมีตัวกลางฟรีบน Cloudflare ทำครั้งเดียว (ประมาณ 10 นาที)</p>
-        <form id="status-form" class="row" autocomplete="off">
-          <input id="status-url" type="url" inputmode="url" placeholder="https://ชื่อ.บัญชี.workers.dev">
-          <button type="submit">บันทึก/ทดสอบ</button>
-        </form>
-        <ol class="steps">
-          <li><b>สร้างแอป Kick:</b> เปิด <a href="https://kick.com/settings/developer" target="_blank" rel="noopener">kick.com/settings/developer</a> (ต้องเปิด 2FA ในบัญชี Kick ก่อน) → Create App → ตั้งชื่ออะไรก็ได้ → Redirect URL ใส่ลิงก์หน้านี้ → บันทึก แล้วจด <b>Client ID</b> กับ <b>Client Secret</b></li>
-          <li><b>สร้าง Worker:</b> เข้า <a href="https://dash.cloudflare.com" target="_blank" rel="noopener">dash.cloudflare.com</a> (สมัครฟรี) → Workers &amp; Pages → Create → Create Worker → Deploy</li>
-          <li><b>ใส่โค้ด:</b> กดปุ่ม "คัดลอกโค้ด Worker" ด้านล่าง → ใน Cloudflare กด Edit code → ลบโค้ดเดิมทั้งหมด → วาง → Deploy</li>
-          <li><b>ใส่รหัส:</b> ที่ Worker → Settings → Variables and Secrets → Add → ชื่อ <code>KICK_CLIENT_ID</code> ใส่ Client ID และ <code>KICK_CLIENT_SECRET</code> (เลือกแบบ Secret) ใส่ Client Secret → Deploy</li>
-          <li><b>เชื่อมกับแอป:</b> คัดลอกลิงก์ <code>.workers.dev</code> ของ Worker มาวางในช่องด้านบน แล้วกด "บันทึก/ทดสอบ"</li>
-        </ol>
-        <button type="button" id="copy-worker" class="wide">📋 คัดลอกโค้ด Worker</button>
-      </details>
+
+    <section data-pane="ch">
+      <button type="button" id="status-warn" class="notice" data-tab="set" hidden>ยังตรวจสถานะออนไลน์ไม่ได้ · ตั้งค่า</button>
       <ol id="d-list"></ol>
+      <p class="hint" id="d-hint">ลาก <svg class="ic sm"><use href="#i-grip"/></svg> เพื่อจัดลำดับ · แตะชื่อเพื่อดูตัวเลือก</p>
+      <div class="row">
+        <button type="button" id="set-save" class="pill ghost grow"><svg class="ic"><use href="#i-save"/></svg>บันทึกเป็นชุด</button>
+        <button type="button" id="clear" class="pill ghost danger"><svg class="ic"><use href="#i-trash"/></svg>ลบทั้งหมด</button>
+      </div>
     </section>
-    <section>
-      <h3>ช่องโปรด</h3>
-      <p class="hint">แตะชื่อเพื่อเปิด/ปิดบนจอ</p>
+
+    <section data-pane="lib" hidden>
+      <h4>ช่องโปรด</h4>
       <div class="chips" id="fav-list"></div>
       <form id="fav-form" class="row" autocomplete="off">
         <input id="fav-input" type="text" inputmode="url" placeholder="เพิ่มช่องโปรด (ลิงก์หรือชื่อ)">
         <button type="submit">เพิ่ม</button>
       </form>
-      <button type="button" id="fav-all" class="wide">เปิดช่องโปรดทั้งหมด</button>
-    </section>
-    <section>
-      <h3>ชุดที่บันทึกไว้</h3>
-      <p class="hint">บันทึกรายการช่อง ลำดับ และรูปแบบจอไว้เปิดทีหลัง</p>
-      <button type="button" id="set-save" class="wide">💾 บันทึกชุดที่ดูอยู่</button>
+      <button type="button" id="fav-open" class="pill ghost wide"></button>
+      <h4>ชุดที่บันทึก</h4>
       <ul class="sets" id="set-list"></ul>
     </section>
-    <section class="foot">
-      <button type="button" id="share" class="wide">🔗 คัดลอกลิงก์แชร์</button>
-      <button type="button" id="clear" class="wide danger">ลบทุกช่องบนจอ</button>
+
+    <section data-pane="set" hidden>
+      <label class="switch"><span><b>ซ่อนช่องที่ออฟไลน์</b><small>ขึ้นมาเองเมื่อเริ่มไลฟ์</small></span><input type="checkbox" id="opt-hide-offline"></label>
+      <label class="switch"><span><b>แสดงชื่อช่องบนจอ</b><small>ป้ายชื่อเล็กๆ มุมซ้ายบน</small></span><input type="checkbox" id="opt-names"></label>
+      <label class="switch"><span><b>หน้าจอไม่ดับระหว่างดู</b><small>กันแท็บเล็ตพักหน้าจอ</small></span><input type="checkbox" id="opt-awake"></label>
+
+      <h4>ตัวตรวจสถานะออนไลน์</h4>
+      <p class="note" id="status-note"></p>
+      <details id="status-setup">
+        <summary>ลิงก์ Worker และวิธีตั้งค่า</summary>
+        <form id="status-form" class="row" autocomplete="off">
+          <input id="status-url" type="url" inputmode="url" placeholder="https://ชื่อ.บัญชี.workers.dev">
+          <button type="submit">บันทึก/ทดสอบ</button>
+        </form>
+        <ol class="steps">
+          <li>สร้างแอปที่ <a href="https://kick.com/settings/developer" target="_blank" rel="noopener">kick.com/settings/developer</a> (ต้องเปิด 2FA) แล้วจด Client ID และ Client Secret</li>
+          <li>สร้าง Worker ที่ <a href="https://dash.cloudflare.com" target="_blank" rel="noopener">dash.cloudflare.com</a> แล้ววางโค้ดจากปุ่มด้านล่าง</li>
+          <li>Settings → Variables and Secrets → เพิ่ม Secret <code>KICK_CLIENT_ID</code> และ <code>KICK_CLIENT_SECRET</code></li>
+          <li>วางลิงก์ <code>.workers.dev</code> ในช่องด้านบน แล้วกด บันทึก/ทดสอบ</li>
+        </ol>
+        <button type="button" id="copy-worker" class="pill ghost wide">คัดลอกโค้ด Worker</button>
+      </details>
+
+      <h4>แชร์</h4>
+      <button type="button" id="share" class="pill ghost wide"><svg class="ic"><use href="#i-link"/></svg>คัดลอกลิงก์ช่องที่ดูอยู่</button>
     </section>
   </aside>
 
   <div id="sheet" hidden role="dialog" aria-labelledby="sheet-title">
-    <div class="panel-head">
-      <strong id="sheet-title"></strong>
-      <button type="button" data-close>✕</button>
+    <div class="sheet-head">
+      <span class="dot" id="sheet-dot"></span>
+      <div class="grow"><strong id="sheet-title"></strong><small id="sheet-sub"></small></div>
+      <button type="button" class="ib" data-close title="ปิด"><svg class="ic"><use href="#i-close"/></svg></button>
     </div>
-    <div class="sheet-grid">
-      <button type="button" data-act="sound"></button>
-      <button type="button" data-act="main">◧ ตั้งเป็นจอหลัก</button>
-      <button type="button" data-act="max">⛶ เต็มจอ</button>
-      <button type="button" data-act="fav"></button>
-      <button type="button" data-act="left">◀ ย้ายไปก่อนหน้า</button>
-      <button type="button" data-act="right">▶ ย้ายไปถัดไป</button>
-      <button type="button" data-act="reload">↻ โหลดใหม่</button>
-      <button type="button" data-act="chat">💬 เปิดแชท</button>
-      <button type="button" data-act="open">↗ เปิดใน Kick</button>
-      <button type="button" data-act="rm" class="danger">✕ ลบช่องนี้</button>
+    <div class="tiles">
+      <button type="button" data-act="sound"><svg class="ic"><use href="#i-vol"/></svg><span></span></button>
+      <button type="button" data-act="main"><svg class="ic"><use href="#i-focus"/></svg><span>จอหลัก</span></button>
+      <button type="button" data-act="max"><svg class="ic"><use href="#i-expand"/></svg><span>เต็มจอ</span></button>
+      <button type="button" data-act="fav"><svg class="ic"><use href="#i-star"/></svg><span>โปรด</span></button>
+    </div>
+    <div class="menu-list">
+      <button type="button" data-act="chat"><svg class="ic"><use href="#i-chat"/></svg>เปิดแชท</button>
+      <button type="button" data-act="open"><svg class="ic"><use href="#i-external"/></svg>เปิดใน Kick</button>
+      <button type="button" data-act="reload"><svg class="ic"><use href="#i-refresh"/></svg>โหลดใหม่</button>
+      <button type="button" data-act="rm" class="danger"><svg class="ic"><use href="#i-trash"/></svg>ลบช่องนี้</button>
     </div>
   </div>
 

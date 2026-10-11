@@ -1,6 +1,7 @@
 // Cloudflare Worker for Multi Kick Viewer: tells the app which Kick channels are live.
 //
-//   GET https://<your-worker>.workers.dev/?c=slug1,slug2   ->   {"ok":true,"live":{"slug1":true,"slug2":false}}
+//   GET https://<your-worker>.workers.dev/?c=slug1,slug2
+//   -> {"ok":true,"live":{"slug1":true,"slug2":false},"info":{"slug1":{"viewers":1234,"title":"...","category":"..."}}}
 //
 // Browsers can't ask Kick directly (no CORS), so this runs on Cloudflare and adds the CORS header.
 // Set KICK_CLIENT_ID and KICK_CLIENT_SECRET (from https://kick.com/settings/developer) under
@@ -51,9 +52,13 @@ async function fetchChannels(slugs, env) {
 }
 
 async function viaOfficialApi(names, env) {
-  const live = {};
+  const live = {}, info = {};
   const record = (data) => {
-    for (const ch of data || []) live[String(ch.slug).toLowerCase()] = !!(ch.stream && ch.stream.is_live);
+    for (const ch of data || []) {
+      const slug = String(ch.slug).toLowerCase();
+      live[slug] = !!(ch.stream && ch.stream.is_live);
+      if (live[slug]) info[slug] = { viewers: ch.stream.viewer_count, title: ch.stream_title, category: ch.category && ch.category.name };
+    }
   };
   const slugs = names.map(slugOf);
   const r = await fetchChannels(slugs, env);
@@ -66,18 +71,23 @@ async function viaOfficialApi(names, env) {
     }
   } else throw new Error(`Kick API error (${r.status})`);
   // Channels Kick didn't return don't exist, so they are not live.
-  return Object.fromEntries(names.map((n) => [n, live[slugOf(n)] === true]));
+  return {
+    live: Object.fromEntries(names.map((n) => [n, live[slugOf(n)] === true])),
+    info: Object.fromEntries(names.filter((n) => info[slugOf(n)]).map((n) => [n, info[slugOf(n)]])),
+  };
 }
 
 async function viaSiteApi(names) {
-  const live = {};
+  const live = {}, info = {};
   await Promise.all(names.slice(0, 40).map(async (n) => {
     const r = await fetch(`https://kick.com/api/v2/channels/${slugOf(n)}`, { headers: { Accept: 'application/json' } });
     if (r.status === 404) { live[n] = false; return; }
     if (!r.ok) throw new Error(`kick.com blocked the request (${r.status}): set KICK_CLIENT_ID and KICK_CLIENT_SECRET`);
-    live[n] = !!(await r.json()).livestream;
+    const ls = (await r.json()).livestream;
+    live[n] = !!ls;
+    if (ls) info[n] = { viewers: ls.viewer_count, title: ls.session_title };
   }));
-  return live;
+  return { live, info };
 }
 
 export default {
@@ -88,8 +98,8 @@ export default {
     const mode = env.KICK_CLIENT_ID && env.KICK_CLIENT_SECRET ? 'official' : 'site';
     if (!names.length) return json({ ok: true, mode });
     try {
-      const live = mode === 'official' ? await viaOfficialApi(names, env) : await viaSiteApi(names);
-      return json({ ok: true, mode, live });
+      const { live, info } = mode === 'official' ? await viaOfficialApi(names, env) : await viaSiteApi(names);
+      return json({ ok: true, mode, live, info });
     } catch (e) {
       return json({ ok: false, mode, error: String((e && e.message) || e) }, 502);
     }
